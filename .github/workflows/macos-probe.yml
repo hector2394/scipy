@@ -1,0 +1,44 @@
+name: SciPy 26769 macOS diagnostic
+
+on:
+  push:
+    branches: [scipy-26769-macos-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.repository == 'hector2394/scipy'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@d3f436a425481402e6a95a1d1fc10331c708cd9e
+        with:
+          pixi-version: v0.83.0
+          cache: false
+          environments: accelerate-lp64
+      - name: Build with Apple clang and Accelerate LP64
+        run: |
+          test "$(uname -m)" = arm64
+          sw_vers
+          xcodebuild -version
+          xcrun clang --version
+          pixi run -e build-accelerate-lp64 bash -euc '
+            export CC="$(xcrun --find clang)"
+            export CXX="$(xcrun --find clang++)"
+            spin build --build-dir=build-accelerate-lp64 --with-accelerate
+          '
+      - name: Measure copy and overwrite results
+        run: >-
+          pixi run -e accelerate-lp64 spin python --no-build
+          -C build-accelerate-lp64 -- "$GITHUB_WORKSPACE/scipy_26769_probe.py"
+      - name: Run both reported test cases
+        run: >-
+          pixi run -e accelerate-lp64 spin test --no-build
+          -C build-accelerate-lp64 -m full -t scipy/linalg/tests/test_decomp.py
+          -- -k 'TestEig and not TestEigh and test_overwrite_f_contiguous'
