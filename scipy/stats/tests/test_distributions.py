@@ -7445,6 +7445,33 @@ class TestRice:
         assert_equal(rvs(b=3., random_state=self.rng).size, 1)
         assert_equal(rvs(b=3., size=(3, 5), random_state=self.rng).shape, (3, 5))
 
+    def test_rice_sf_tail(self):
+        # Integrate the PDF over [x, inf) with mpmath at 70-digit precision.
+        x = np.array([[10.0], [14.38449888287663]])
+        b = [0.0, 1.5]
+        expected = np.array([[1.9287498479639178e-22, 2.4826430762144744e-17],
+                             [1.1728364474869907e-45, 8.5941331417799894e-38]])
+        assert_allclose(stats.rice.sf(x, b), expected, rtol=5e-14, atol=0)
+        assert_allclose(stats.rice.logsf(x, b), np.log(expected), rtol=5e-14)
+
+    def test_rice_sf_squared_overflow(self):
+        x = [1e155, 1., 1.]
+        b = [1.5, 1e155, np.inf]
+        with np.errstate(over='ignore'):
+            assert_equal(stats.rice.sf(x, b), [0., 1., 1.])
+            assert_equal(stats.rice.logsf(x, b), [-np.inf, 0., 0.])
+
+            x, b = 2e20, np.float32(1e20)
+            assert_equal(stats.rice.sf(x, b), 1 - stats.rice.cdf(x, b))
+
+    def test_rice_sf_mixed_tails(self):
+        # The Boost tail can overflow at the leftmost point.
+        x = [1e-5, 10.]
+        b = [20., 1.5]
+        expected = [1., 2.4826430762144744e-17]
+        assert_allclose(stats.rice.sf(x, b), expected, rtol=5e-14, atol=0)
+        assert_allclose(stats.rice.logsf(x, b), np.log(expected), rtol=5e-14)
+
     def test_rice_gh9836(self):
         # test that gh-9836 is resolved; previously jumped to 1 at the end
 

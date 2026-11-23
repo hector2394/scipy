@@ -9444,6 +9444,14 @@ class rice_gen(rv_continuous):
     def _cdf(self, x, b):
         return sc.chndtr(np.square(x), 2, np.square(b))
 
+    def _sf(self, x, b):
+        x2, b2 = np.square(x), np.square(b)
+        finite = np.isfinite(x2) & np.isfinite(b2)
+        # The CDF complement is stable on the left and handles infinite inputs.
+        return xpx.apply_where((x > b) & finite, (x2, b2),
+                               lambda x2, b2: ncx2._sf(x2, 2, b2),
+                               lambda x2, b2: 1 - sc.chndtr(x2, 2, b2))
+
     def _ppf(self, q, b):
         return np.sqrt(sc.chndtrix(q, 2, np.square(b)))
 
